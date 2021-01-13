@@ -42,6 +42,8 @@ const useFetchye = (
   const numOfRenders = useRef(0);
   numOfRenders.current += 1;
 
+  const retryOnErrorCount = useRef(0);
+
   useEffect(() => {
     if (options.defer || !computedKey) {
       return;
@@ -54,6 +56,31 @@ const useFetchye = (
     if (!loading && !data && !error) {
       runAsync({
         dispatch, computedKey, fetcher: selectedFetcher, fetchClient, options,
+      });
+    }
+  });
+
+  useEffect(() => {
+    const { loading, error } = selectorState.current;
+
+    const hasOnError = typeof options?.errors?.onError === 'function';
+    const maxOnErrorRetry = options?.errors?.maxOnErrorRetry || 1;
+
+    if (
+      error
+      && !loading
+      && hasOnError
+      && retryOnErrorCount.current <= maxOnErrorRetry
+    ) {
+      const { onError } = options.errors;
+      const run = () => {
+        retryOnErrorCount.current += 1;
+        return runAsync({
+          dispatch, computedKey, fetcher: selectedFetcher, fetchClient, options,
+        });
+      };
+      onError({
+        key, error, run, options, retryOnErrorCount: retryOnErrorCount.current, maxOnErrorRetry,
       });
     }
   });
